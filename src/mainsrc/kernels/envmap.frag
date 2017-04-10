@@ -8,5 +8,5 @@ uniform samplerCube CubeMapTex;
 uniform vec3 cameraPos;
 
 void main() {
-
+	gl_FragColor = textureCube(CubeMapTex, ReflectDir);
 }

@@ -64,6 +64,7 @@ void RotateObject(float delta_x, float delta_y);
 // Rendermode must remain as ENVIRONMENTMAP
 // for this assignment
 //------------------------------------
+//RenderMode startMode = ENVIRONMENTMAP;
 
 // lights
 static float ambientLight[]  = {0.20, 0.20, 0.20, 1.0};
@@ -137,7 +138,9 @@ static GLenum CubeFaceTarget[6] = {
 // To load other cubemaps, replace these mages with your own cubemap files in the correct order
 // It is optional and not required to test other cube maps
 //------------------------------------------------------------------------------------
-char *cmapFiles[6];
+char *cmapFiles[6] = {"../../data/images/stpeters/posx.jpg", "../../data/images/stpeters/negx.jpg",
+						"../../data/images/stpeters/posy.jpg", "../../data/images/stpeters/negy.jpg",
+						"../../data/images/stpeters/posz.jpg", "../../data/images/stpeters/negz.jpg"};
 
 
 //------------------------------------------------------------------------------------
@@ -152,6 +155,15 @@ char *cmapFiles[6];
 //------------------------------------------------------------------------------------
 void LoadCubeFace(GLenum target, char *filename,unsigned int num)
 {
+	GLuint textureNum;
+	glGenTextures(1, &textureNum);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, textureNum);
+
+	STImage currTex = STImage(filename);
+	const STColor4ub *pixels = currTex.GetPixels();
+
+	gluBuild2DMipmaps(target, 1, currTex.GetWidth(), currTex.GetHeight(), GL_RGBA, num, pixels);
 }
 
 
@@ -216,7 +228,7 @@ void drawskybox(){
 
         glEnd();
 
-        glBindTexture(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, skybox[2]);
+        glBindTexture(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, skybox[2]);//og 2
         glBegin(GL_QUADS);
 
         glVertex3f(-fExtent, fExtent, fExtent);
@@ -226,7 +238,7 @@ void drawskybox(){
 
         glEnd();
 
-        glBindTexture(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, skybox[2]);
+        glBindTexture(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, skybox[2]); //og 2
         glBegin(GL_QUADS);
 
         glVertex3f(-fExtent, -fExtent, -fExtent);
@@ -285,6 +297,17 @@ void GenerateCubeMap(void)
     //--------------------------------------------------------------------
 
     //-------------------------------------------------------------------------
+
+    for (int i = 0; i < 6; i++){
+    	LoadCubeFace(CubeFaceTarget[i], cmapFiles[i], skybox[i]);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    glEnable(GL_TEXTURE_CUBE_MAP);
+    GenerateTextureCoordinates();
+    SetTextureWrapFlags();
 
     // enable the texture coordinates that will be used
     glEnable(GL_TEXTURE_GEN_S);
@@ -398,6 +421,13 @@ void SetUpEnvironmentMap(void)
     // To load shaders, use the function LoadVertexShader found in the STShaderProgram class.
     //---------------------------------------------------
     //----------------------------------------
+    GenerateCubeMap();
+    envmapshader = new STShaderProgram();
+    envmapshader->LoadVertexShader(envmapVertexShader);
+    envmapshader->LoadFragmentShader(envmapFragmentShader);
+    reflectanceshader = new STShaderProgram();
+    reflectanceshader->LoadVertexShader(reflectionVertexShader);
+    reflectanceshader->LoadFragmentShader(reflectionFragmentShader);
 
 }
 
@@ -462,12 +492,12 @@ void ReflectanceMapping(void)
     // It is not needed for environmapping and needs
     // to be removed for enviorment mapping to work
     //---------------------------------------------------
-    gluPerspective( 35.0,  1.0, 1.0, 200.0);
+    /*gluPerspective( 35.0,  1.0, 1.0, 200.0);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(0.0, 0.0, 15.0, 
               0.0, 0.0, 0.0,          
-              0.0, 1.0, 0.);          
+              0.0, 1.0, 0.);    */     
     //--------------------------------------------------
 
 
@@ -481,6 +511,9 @@ void ReflectanceMapping(void)
     // ----------------------------------------------------------
 
     //-----------------------------------------------------------
+    reflectanceshader->Bind();
+    envmapshader->Bind();
+    drawskybox();
 
 
     // this code draws the object - a teapot
@@ -501,6 +534,9 @@ void ReflectanceMapping(void)
     // 3. you must determine the correct order to bind and unbind
     //   your shaders and textures.
     //----------------------------------------------------------
+
+    reflectanceshader->UnBind();
+    envmapshader->UnBind();
 
     //----------------------------------------------------------
 
