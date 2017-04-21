@@ -101,15 +101,12 @@ static int gWindowSizeY = 800;
 int gPreviousMouseX = -1;
 int gPreviousMouseY = -1;
 int gMouseButton = -1;
-bool bSpin = false;
-bool bMove = false;
-int beginx;
-int beginy;
-float displayangle;
-float displayaxisx;
-float displayaxisy;
-float displayaxisz;
 
+//Camera Vectors
+STVector3 mPosition;
+STVector3 mLookAt;
+STVector3 mRight;
+STVector3 mUp;
 
 
 //---------------------------------------------
@@ -139,8 +136,72 @@ static GLenum CubeFaceTarget[6] = {
 // It is optional and not required to test other cube maps
 //------------------------------------------------------------------------------------
 char *cmapFiles[6] = {"../../data/images/stpeters/posx.jpg", "../../data/images/stpeters/negx.jpg",
-						"../../data/images/stpeters/posy.jpg", "../../data/images/stpeters/negy.jpg",
+						"../../data/images/stpeters/negy.jpg", "../../data/images/stpeters/posy.jpg",
 						"../../data/images/stpeters/posz.jpg", "../../data/images/stpeters/negz.jpg"};
+
+//Camera Methods
+void SetUpAndRight()
+{
+    mRight = STVector3::Cross(mLookAt - mPosition, mUp);
+    mRight.Normalize();
+    mUp = STVector3::Cross(mRight, mLookAt - mPosition);
+    mUp.Normalize();
+}
+
+void resetCamera()
+{
+    mLookAt=STVector3(0.f,0.f,0.f);
+    mPosition=STVector3(0.f,5.f,8.f);
+    mUp=STVector3(0.f,1.f,0.f);
+
+    SetUpAndRight();
+}
+
+void resetUp()
+{
+    mUp = STVector3(0.f,1.f,0.f);
+    mRight = STVector3::Cross(mLookAt - mPosition, mUp);
+    mRight.Normalize();
+    mUp = STVector3::Cross(mRight, mLookAt - mPosition);
+    mUp.Normalize();
+}
+
+void RotateCamera(float delta_x, float delta_y)
+{
+    float yaw_rate=1.f;
+    float pitch_rate=1.f;
+
+    mPosition -= mLookAt;
+    STMatrix4 m;
+    m.EncodeR(-1*delta_x*yaw_rate, mUp);
+    mPosition = m * mPosition;
+    m.EncodeR(-1*delta_y*pitch_rate, mRight);
+    mPosition = m * mPosition;
+
+    mPosition += mLookAt;
+}
+
+void ZoomCamera(float delta_y)
+{
+    STVector3 direction = mLookAt - mPosition;
+    float magnitude = direction.Length();
+    direction.Normalize();
+    float zoom_rate = 0.1f*magnitude < 0.5f ? .1f*magnitude : .5f;
+    if(delta_y * zoom_rate + magnitude > 0)
+    {
+        mPosition += (delta_y * zoom_rate) * direction;
+    }
+}
+
+void StrafeCamera(float delta_x, float delta_y)
+{
+    float strafe_rate = 0.05f;
+    
+    mPosition -= strafe_rate * delta_x * mRight;
+    mLookAt   -= strafe_rate * delta_x * mRight;
+    mPosition += strafe_rate * delta_y * mUp;
+    mLookAt   += strafe_rate * delta_y * mUp;
+}
 
 
 //------------------------------------------------------------------------------------
@@ -228,7 +289,7 @@ void drawskybox(){
 
         glEnd();
 
-        glBindTexture(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, skybox[2]);//og 2
+        glBindTexture(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, skybox[2]);
         glBegin(GL_QUADS);
 
         glVertex3f(-fExtent, fExtent, fExtent);
@@ -238,7 +299,7 @@ void drawskybox(){
 
         glEnd();
 
-        glBindTexture(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, skybox[2]); //og 2
+        glBindTexture(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, skybox[2]);
         glBegin(GL_QUADS);
 
         glVertex3f(-fExtent, -fExtent, -fExtent);
@@ -457,6 +518,7 @@ void Setup()
     envmapshader = NULL;
     reflectanceshader = NULL;
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    resetCamera();
 
 
     // this is the function that sets up the environment map
@@ -470,6 +532,10 @@ void Setup()
 //----------------------------------------------------
 void CleanUp()
 {
+    for (int i = 0; i < 6; i++){
+        delete skybox;
+        delete CubeFaceTarget;
+    }
 }
 
 
@@ -524,7 +590,7 @@ void ReflectanceMapping(void)
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
     glTranslatef(0.0, 0.0, -1.5); // move to position
-    glRotatef(displayangle, displayaxisx, displayaxisy, displayaxisz); //  rotate around center
+    //glRotatef(displayangle, displayaxisx, displayaxisy, displayaxisz); //  rotate around center
     glTranslatef(0.0, 0.0, 1.5); //move object to center
     GenerateTeaPotModel(5, 1.1);  // draw the teapot model
     glPopMatrix();
@@ -550,17 +616,20 @@ void ReflectanceMapping(void)
 //--------------------------------------------------
 // Display the output image from our vertex and fragment shaders
 //--------------------------------------------------
+// Display the output image
 void DisplayCallback()
 {
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    SetUpAndRight();
+
+    gluLookAt(mPosition.x,mPosition.y,mPosition.z,
+              mLookAt.x,mLookAt.y,mLookAt.z,
+              mUp.x,mUp.y,mUp.z);
     ReflectanceMapping();
 }
 
-//--------------------------------------------------
-// Reshape the window and record the size so
-// that we can use it for screenshots.
-// Note that if you resize the window and the aspect ratio
-// is no longer 1:1, your object will be distorted on the screen
-//----------------------------------------------------
+//Reshape window.
 void ReshapeCallback(int w, int h)
 {
     gWindowSizeX = w;
@@ -613,90 +682,78 @@ void KeyCallback(unsigned char key, int x, int y)
 }
 
 
-//-------------------------------------------------
-// sets the move flag true based on mouse position
-// and state
-//-------------------------------------------------
-void ManipulationMode(int button, int state, int x, int y)
+//Process key calls.
+void SpecialKeyCallback(int key, int x, int y)
 {
-  if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-    bSpin = false;
-    glutIdleFunc(NULL);
-    bMove = true;
-    beginx = x;
-    beginy = y;
-  }
-  if (button == GLUT_LEFT_BUTTON && state == GLUT_UP) {
-    bMove = false;
-  }
-}
-
-
-//-------------------------------------------------
-// Mouse event handler
-// sets the move flag true based on mouse position
-// and state
-//-------------------------------------------------
-void MouseCallback(int button, int state, int x, int y)
-{
-    ManipulationMode(button, state, x, y);  
-}
-
-
-//-------------------------------------------------
-// Mouse active motion callback (when button is pressed)
-//-------------------------------------------------
-void MouseMotionCallback(int x, int y)
-{
-    motion(x, y);
-}
-
-
-//-------------------------------------------------
-// Spin object
-//-------------------------------------------------
-
-// spin
-void Spin (void)
-{
+    switch(key) {
+        case GLUT_KEY_LEFT:
+            StrafeCamera(10,0);
+            break;
+        case GLUT_KEY_RIGHT:
+            StrafeCamera(-10,0);
+            break;
+        case GLUT_KEY_DOWN:
+            StrafeCamera(0,-10);
+            break;
+        case GLUT_KEY_UP:
+            StrafeCamera(0,10);
+            break;
+        default:
+            break;
+    }
     glutPostRedisplay();
 }
 
-void SpinObject(float p1x, float p1y, float p2x, float p2y)
+// Mouse event handler
+void MouseCallback(int button, int state, int x, int y)
 {
-    float delta_x = p2x - p1x;
-    float delta_y = p2y - p1y;
-
-    delta_x = delta_x/100;
-    delta_y = delta_y/100;
-
-
-    displayangle = atan2(delta_y,delta_x) * 180 / 3.141;
-
-    displayaxisx = 0;
-    displayaxisy = 0;
-    displayaxisz = 0;
-    if(delta_x > delta_y)
-        displayaxisy = 1;
-    if(delta_y > delta_x)
-        displayaxisx = 1;
-
+    if (button == GLUT_LEFT_BUTTON
+        || button == GLUT_RIGHT_BUTTON
+        || button == GLUT_MIDDLE_BUTTON)
+    {
+        gMouseButton = button;
+    } else
+    {
+        gMouseButton = -1;
+    }
+    
+    if (state == GLUT_UP)
+    {
+        gPreviousMouseX = -1;
+        gPreviousMouseY = -1;
+    }
 }
 
 
-void motion(int x, int y)
+// Mouse active motion callback.
+void MouseMotionCallback(int x, int y)
 {
-    if (bMove) {
-
-        SpinObject((2.0 * beginx - gWindowSizeX) / gWindowSizeX,
-        (gWindowSizeY - 2.0 * beginy) / gWindowSizeY,
-        (2.0 * x - gWindowSizeX) / gWindowSizeX,
-        (gWindowSizeY - 2.0 * y) / gWindowSizeY);
-
-        beginx = x;
-        beginy = y;
-        bSpin = true;
-        glutIdleFunc(Spin);
+     if (gPreviousMouseX >= 0 && gPreviousMouseY >= 0)
+    {
+        //compute delta
+        float deltaX = x-gPreviousMouseX;
+        float deltaY = y-gPreviousMouseY;
+        gPreviousMouseX = x;
+        gPreviousMouseY = y;
+        
+        //orbit, strafe, or zoom
+        if (gMouseButton == GLUT_LEFT_BUTTON)
+        {
+            RotateCamera(deltaX, deltaY);
+        }
+        else if (gMouseButton == GLUT_MIDDLE_BUTTON)
+        {
+            StrafeCamera(deltaX, deltaY);
+        }
+        else if (gMouseButton == GLUT_RIGHT_BUTTON)
+        {
+            ZoomCamera(deltaY);
+        }
+        
+    } else
+    {
+        gPreviousMouseX = x;
+        gPreviousMouseY = y;
     }
 }
 
@@ -769,11 +826,6 @@ int main(int argc, char** argv)
 
     // set  the scene
     Setup();
-    
-    // init display axes
-    displayaxisx = 0;
-    displayaxisy = 0;
-    displayaxisz = 0;
 
     // run the main glut loop
     glutMainLoop();
