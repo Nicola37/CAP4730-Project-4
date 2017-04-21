@@ -780,8 +780,8 @@ int main(int argc, char** argv)
     envmapVertexShader              = std::string("kernels/envmap.vert");
     reflectionFragmentShader        = std::string("kernels/reflectance.frag");
     reflectionVertexShader          = std::string("kernels/reflectance.vert");
-    vertexShader                    = std::string("kernels/default.vert");
-    fragmentShader                  = std::string("kernels/phong.frag");
+    //vertexShader                    = std::string("kernels/default.vert");
+    //fragmentShader                  = std::string("kernels/phong.frag");
 
 
     // TO DO: proj4_GLSLShaders

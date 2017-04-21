@@ -8,5 +8,6 @@ uniform samplerCube CubeMapTex;
 
 
 void main() {
+	//setting the skybox color
 	gl_FragColor = textureCube(CubeMapTex, TexCoords);
 }

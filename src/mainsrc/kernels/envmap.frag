@@ -8,5 +8,6 @@ uniform samplerCube CubeMapTex;
 uniform vec3 cameraPos;
 
 void main() {
+	//set the teapot's color
 	gl_FragColor = textureCube(CubeMapTex, ReflectDir);
 }
