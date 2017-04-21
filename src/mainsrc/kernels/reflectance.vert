@@ -13,7 +13,8 @@ void main()
 	//ReflectDir = gl_NormalMatrix*VertexPosition;
 
 	//ReflectDir = VertexPosition;
+	//ReflectDir = VertexPosition;
 
-	gl_Position = ftransform();
-
+	//gl_Position = vec4(VertexPosition, 1.0);
+	
 }

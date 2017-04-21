@@ -155,15 +155,15 @@ char *cmapFiles[6] = {"../../data/images/stpeters/posx.jpg", "../../data/images/
 //------------------------------------------------------------------------------------
 void LoadCubeFace(GLenum target, char *filename,unsigned int num)
 {
-	GLuint textureNum;
-	glGenTextures(1, &textureNum);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, textureNum);
+	glGenTextures(1, skybox);
+	glActiveTexture(target);
+	glBindTexture(target, skybox[num]);
 
 	STImage currTex = STImage(filename);
 	const STColor4ub *pixels = currTex.GetPixels();
 
-	gluBuild2DMipmaps(target, 1, currTex.GetWidth(), currTex.GetHeight(), GL_RGBA, num, pixels);
+	gluBuild2DMipmaps(target, GL_RGBA, 2048, 2048, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    //glTexImage2D(target, 0, GL_RGBA, 2048, 2048, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 }
 
 
@@ -298,8 +298,8 @@ void GenerateCubeMap(void)
 
     //-------------------------------------------------------------------------
 
-    for (int i = 0; i < 6; i++){
-    	LoadCubeFace(CubeFaceTarget[i], cmapFiles[i], skybox[i]);
+    for (unsigned int i = 0; i < 6; i++){
+    	LoadCubeFace(CubeFaceTarget[i], cmapFiles[i], i);
     }
 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -535,8 +535,8 @@ void ReflectanceMapping(void)
     //   your shaders and textures.
     //----------------------------------------------------------
 
-    reflectanceshader->UnBind();
     envmapshader->UnBind();
+    reflectanceshader->UnBind();
 
     //----------------------------------------------------------
 
