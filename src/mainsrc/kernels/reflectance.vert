@@ -1,5 +1,6 @@
 #version 120
 attribute  vec3 VertexPosition;
+varying vec3 TexCoords;
 
 varying vec3 ReflectDir;
 
@@ -16,5 +17,7 @@ void main()
 	//ReflectDir = VertexPosition;
 
 	//gl_Position = vec4(VertexPosition, 1.0);
+	gl_Position = gl_ProjectionMatrix*gl_ModelViewMatrix * vec4(VertexPosition, 1.0);
+	TexCoords = VertexPosition;
 	
 }
